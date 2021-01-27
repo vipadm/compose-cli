@@ -19,18 +19,15 @@ package compose
 import (
 	"context"
 
+	"github.com/compose-spec/compose-go/types"
 	moby "github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 
 	"github.com/docker/compose-cli/api/compose"
 	"github.com/docker/compose-cli/api/progress"
-
-	"github.com/compose-spec/compose-go/types"
-	"golang.org/x/sync/errgroup"
 )
 
 func (s *composeService) Stop(ctx context.Context, project *types.Project, consumer compose.LogConsumer) error {
-	eg, _ := errgroup.WithContext(ctx)
 	w := progress.ContextWriter(ctx)
 
 	var containers Containers
@@ -42,15 +39,10 @@ func (s *composeService) Stop(ctx context.Context, project *types.Project, consu
 		return err
 	}
 
-	err = InReverseDependencyOrder(ctx, project, func(c context.Context, service types.ServiceConfig) error {
+	return InReverseDependencyOrder(ctx, project, func(c context.Context, service types.ServiceConfig) error {
 		serviceContainers, others := containers.split(isService(service.Name))
 		err := s.stopContainers(ctx, w, serviceContainers)
 		containers = others
 		return err
 	})
-	if err != nil {
-		return err
-	}
-
-	return eg.Wait()
 }
